@@ -10,6 +10,11 @@ A powerful Next.js application for creating stunning SVG gradient backgrounds wi
 - **API Integration**: Generate gradients programmatically via REST API
 - **SVG Export**: Download your creations as high-quality SVG files
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Color Wheel Picker**: Interactive color wheel for intuitive color selection
+- **Dual Selection Modes**:
+  - **Free Mode**: Manually select any colors from the color wheel
+  - **Recommended Mode**: Smart color recommendations based on color theory
+- **Color Theory Algorithms**: Includes complementary, analogous, triadic, split-complementary, and monochromatic color schemes
 
 ## Getting Started
 
@@ -66,6 +71,50 @@ GET https://gbg.nuclearrockstone.xyz/api?colors=hex_FF0000&colors=hex_00FF00&wid
 - `colors`: Hex colors with `hex_` prefix (e.g., `hex_FF0000` for red)
 - `width`: Image width in pixels (100-2000)
 - `height`: Image height in pixels (100-2000)
+
+## Color Selection Modes
+
+### Free Selection Mode
+- Interactive color wheel for visual color selection
+- Click and drag to select colors directly from the wheel
+- Add up to 8 colors to your gradient palette
+- Fine-tune colors with hex code input
+
+### Recommended Selection Mode
+- Select a primary color and get smart recommendations
+- Color theory-based suggestions including:
+  - **Complementary Colors**: Opposite on the color wheel for high contrast
+  - **Analogous Colors**: Adjacent colors for harmonious combinations
+  - **Triadic Colors**: Three colors equally spaced for vibrant palettes
+  - **Split-Complementary**: Variation of complementary with softer contrast
+  - **Monochromatic**: Shades and tints of the same hue
+
+## Testing
+
+### Running the Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
+
+### Color Utility Tests
+Test the color conversion and recommendation algorithms by running the test file. You can use Node.js to execute it directly:
+
+```bash
+# Create a simple test runner if needed, or integrate with your test framework
+npx tsx src/lib/__tests__/colorUtils.test.ts
+```
+
+## Color Algorithms
+
+The color recommendation system uses standard color theory:
+
+1. **RGB-HSL Conversion**: Colors are converted between RGB and HSL color spaces for easier manipulation
+2. **Complementary**: Hue shifted by 180°
+3. **Analogous**: Hues shifted by ±30°
+4. **Triadic**: Hues shifted by ±120°
+5. **Split-Complementary**: Hues shifted by ±150°
+6. **Monochromatic**: Same hue, varying lightness
 
 ## Learn More
 
