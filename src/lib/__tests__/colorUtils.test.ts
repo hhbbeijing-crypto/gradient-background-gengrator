@@ -12,9 +12,12 @@ import {
   hslToHex,
   generateHarmonyColors,
   getSmartColorRecommendation,
+  getColorRecommendations,
   getContrastRatio,
   getHslFromWheelPosition,
   getColorWheelPosition,
+  calculateHarmonyScore,
+  generateDualColorGradients,
   type HarmonyMode
 } from '../colorUtils';
 
@@ -131,6 +134,36 @@ describe('Color Utils', () => {
       expect(Math.abs(hsls[1].h - hsls[0].h)).toBe(150);
       expect(Math.abs(hsls[2].h - hsls[0].h)).toBe(210);
     });
+
+    test('diadic colors include 60 degree offset', () => {
+      const colors = generateHarmonyColors('#FF0000', 'diadic');
+      expect(colors).toHaveLength(3);
+      
+      const hsls = colors.map(hexToHsl);
+      const diff1 = Math.abs(hsls[1].h - hsls[0].h);
+      expect(diff1).toBe(60);
+    });
+
+    test('warmCool generates warm-cool contrast', () => {
+      const warmBase = generateHarmonyColors('#FF5500', 'warmCool');
+      const coolBase = generateHarmonyColors('#0055FF', 'warmCool');
+      
+      expect(warmBase).toHaveLength(3);
+      expect(coolBase).toHaveLength(3);
+      
+      // 暖色基础应该生成冷色
+      const warmBaseHsl = hexToHsl(warmBase[0]);
+      const warmGeneratedHsl = hexToHsl(warmBase[1]);
+      
+      // 冷色基础应该生成暖色
+      const coolBaseHsl = hexToHsl(coolBase[0]);
+      const coolGeneratedHsl = hexToHsl(coolBase[1]);
+      
+      // 验证冷暖对比
+      expect(warmBaseHsl.h).toBeLessThan(60); // 暖色
+      expect(warmGeneratedHsl.h).toBeGreaterThan(180); // 冷色
+      expect(warmGeneratedHsl.h).toBeLessThan(300);
+    });
   });
 
   describe('Smart Recommendation', () => {
@@ -140,23 +173,96 @@ describe('Color Utils', () => {
       expect(rec).toHaveProperty('colors');
       expect(rec).toHaveProperty('name');
       expect(rec).toHaveProperty('description');
+      expect(rec).toHaveProperty('score');
       expect(rec.colors.length).toBeGreaterThan(0);
+      expect(rec.score).toBeGreaterThan(0);
     });
 
-    test('recommends different modes based on color characteristics', () => {
+    test('getColorRecommendations returns multiple recommendations', () => {
+      const recs = getColorRecommendations('#FF0000', 3);
+      expect(recs).toHaveLength(3);
+      
+      // 验证按分数排序
+      for (let i = 0; i < recs.length - 1; i++) {
+        expect(recs[i].score).toBeGreaterThanOrEqual(recs[i + 1].score);
+      }
+    });
+
+    test('recommends appropriate modes based on color characteristics', () => {
       const darkColor = getSmartColorRecommendation('#330000');
       const lightColor = getSmartColorRecommendation('#FFCCCC');
       const mutedColor = getSmartColorRecommendation('#808080');
       const vibrantColor = getSmartColorRecommendation('#FF0080');
+      const warmColor = getSmartColorRecommendation('#FF6600');
+      const coolColor = getSmartColorRecommendation('#0066FF');
 
-      // 深色通常推荐互补色
-      expect(['complementary', 'analogous']).toContain(darkColor.mode);
-      // 浅色通常推荐三角色
-      expect(['triadic', 'analogous']).toContain(lightColor.mode);
-      // 低饱和度通常推荐类似色
-      expect(['analogous', 'monochromatic']).toContain(mutedColor.mode);
-      // 鲜艳颜色通常推荐分裂互补色
-      expect(['splitComplementary', 'analogous', 'triadic']).toContain(vibrantColor.mode);
+      // 深色通常推荐互补色或类似色
+      expect(['complementary', 'analogous', 'diadic']).toContain(darkColor.mode);
+      
+      // 浅色通常推荐三角色或类似色
+      expect(['triadic', 'analogous', 'complementary']).toContain(lightColor.mode);
+      
+      // 低饱和度通常推荐类似色或单色
+      expect(['analogous', 'monochromatic', 'complementary']).toContain(mutedColor.mode);
+      
+      // 鲜艳颜色通常推荐分裂互补色或三角色
+      expect(['splitComplementary', 'triadic', 'analogous', 'diadic']).toContain(vibrantColor.mode);
+      
+      // 暖色/冷色通常推荐冷暖对比
+      expect(['warmCool', 'complementary', 'splitComplementary']).toContain(warmColor.mode);
+      expect(['warmCool', 'complementary', 'splitComplementary']).toContain(coolColor.mode);
+    });
+  });
+
+  describe('Harmony Score Calculation', () => {
+    test('calculateHarmonyScore returns score between 0 and 100', () => {
+      const colors = ['#FF0000', '#00FF00'];
+      const score = calculateHarmonyScore(colors);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    });
+
+    test('complementary colors have high harmony score', () => {
+      const complementary = ['#FF0000', '#00FFFF'];
+      const similar = ['#FF0000', '#FF3300'];
+      
+      const compScore = calculateHarmonyScore(complementary);
+      const simScore = calculateHarmonyScore(similar);
+      
+      // 互补色应该有更高的和谐度评分
+      expect(compScore).toBeGreaterThan(simScore);
+    });
+
+    test('single color returns 0 score', () => {
+      const score = calculateHarmonyScore(['#FF0000']);
+      expect(score).toBe(0);
+    });
+  });
+
+  describe('Dual Color Gradients', () => {
+    test('generateDualColorGradients returns gradient options', () => {
+      const gradients = generateDualColorGradients('#FF0000', '#0000FF');
+      expect(gradients.length).toBeGreaterThan(0);
+      
+      gradients.forEach(grad => {
+        expect(grad).toHaveProperty('name');
+        expect(grad).toHaveProperty('colors');
+        expect(grad).toHaveProperty('angle');
+        expect(grad).toHaveProperty('description');
+        expect(grad.colors.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+    test('similar colors get contrast enhancement option', () => {
+      const similarColors = generateDualColorGradients('#FF0000', '#FF3300');
+      const hasContrastEnhancement = similarColors.some(g => g.name === '对比增强');
+      expect(hasContrastEnhancement).toBe(true);
+    });
+
+    test('contrasting colors get harmony transition option', () => {
+      const contrastingColors = generateDualColorGradients('#FF0000', '#00FF00');
+      const hasHarmonyTransition = contrastingColors.some(g => g.name === '和谐过渡');
+      expect(hasHarmonyTransition).toBe(true);
     });
   });
 
@@ -216,7 +322,7 @@ describe('Color Utils', () => {
 
 // 手动测试运行器（用于非Jest环境）
 export function runManualTests() {
-  console.log('Running manual color utils tests...\n');
+  console.log('🎨 Running manual color utils tests...\n');
 
   let passed = 0;
   let failed = 0;
@@ -224,11 +330,11 @@ export function runManualTests() {
   function test(name: string, fn: () => void) {
     try {
       fn();
-      console.log(`✓ ${name}`);
+      console.log(`✅ ${name}`);
       passed++;
     } catch (error) {
-      console.log(`✗ ${name}`);
-      console.error(`  Error: ${error}`);
+      console.log(`❌ ${name}`);
+      console.error(`   Error: ${error}`);
       failed++;
     }
   }
@@ -266,9 +372,19 @@ export function runManualTests() {
           throw new Error(`Expected ${actual} to be greater than ${expected}`);
         }
       },
+      toBeGreaterThanOrEqual(expected: number) {
+        if (Number(actual) < expected) {
+          throw new Error(`Expected ${actual} to be greater than or equal to ${expected}`);
+        }
+      },
       toBeLessThan(expected: number) {
         if (Number(actual) >= expected) {
           throw new Error(`Expected ${actual} to be less than ${expected}`);
+        }
+      },
+      toBeLessThanOrEqual(expected: number) {
+        if (Number(actual) > expected) {
+          throw new Error(`Expected ${actual} to be less than or equal to ${expected}`);
         }
       },
       toContain(item: unknown) {
@@ -329,9 +445,28 @@ export function runManualTests() {
     expect(rec).toHaveProperty('colors');
     expect(rec).toHaveProperty('name');
     expect(rec).toHaveProperty('description');
+    expect(rec).toHaveProperty('score');
   });
 
-  console.log(`\n${passed} passed, ${failed} failed`);
+  // 和谐度评分测试
+  test('harmony score returns valid value', () => {
+    const score = calculateHarmonyScore(['#FF0000', '#00FF00']);
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  // 双色渐变测试
+  test('dual color gradients returns options', () => {
+    const gradients = generateDualColorGradients('#FF0000', '#0000FF');
+    expect(gradients.length).toBeGreaterThan(0);
+  });
+
+  console.log(`\n📊 Test Results: ${passed} passed, ${failed} failed`);
+  
+  if (failed === 0) {
+    console.log('🎉 All tests passed!');
+  }
+  
   return { passed, failed };
 }
 

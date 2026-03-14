@@ -1,13 +1,13 @@
 # Gradient Background Generator
 
-A powerful Next.js application for creating stunning SVG gradient backgrounds with real-time preview, interactive color wheel, and AI-powered color recommendations.
+A powerful Next.js application for creating stunning SVG gradient backgrounds with real-time preview, interactive dual-color wheel, and AI-powered color recommendations.
 
 ## Features
 
-- **Interactive Color Wheel**: Visual color selection with drag-and-drop interface
+- **Interactive Dual-Color Wheel**: Visual color selection with two simultaneous color pickers on the same wheel
 - **Dual Selection Modes**:
-  - **Free Selection Mode**: Manually pick colors on the color wheel
-  - **Recommendation Mode**: AI-powered color harmony suggestions
+  - **Free Selection Mode**: Manually pick two colors simultaneously on the color wheel
+  - **Recommendation Mode**: AI-powered color harmony suggestions based on color theory
 - **Color Harmony Algorithms**:
   - **Complementary**: Colors opposite on the color wheel (180° apart)
   - **Analogous**: Adjacent colors for harmonious blends (±30°)
@@ -15,7 +15,10 @@ A powerful Next.js application for creating stunning SVG gradient backgrounds wi
   - **Split Complementary**: Base color plus adjacent to its complement
   - **Tetradic**: Four colors forming a rectangle on the wheel
   - **Monochromatic**: Single hue with varying lightness/saturation
-- **Smart Recommendations**: System analyzes your base color and suggests the best harmony mode
+  - **Diadic**: 60° contrast colors for modern designs
+  - **Warm-Cool**: Warm and cool tone contrast
+- **Smart Recommendations**: System analyzes your base color and suggests the best harmony mode with scoring
+- **Harmony Score**: Real-time calculation of color harmony degree (0-100%)
 - **Real-time Preview**: See your gradient backgrounds update instantly as you modify colors
 - **Preset Templates**: Choose from professionally designed color combinations
 - **API Integration**: Generate gradients programmatically via REST API
@@ -26,24 +29,53 @@ A powerful Next.js application for creating stunning SVG gradient backgrounds wi
 
 ### Color Harmony Modes
 
-The application implements six scientifically-proven color harmony formulas based on the color wheel:
+The application implements eight scientifically-proven color harmony formulas based on the color wheel:
 
-| Mode | Description | Best For |
-|------|-------------|----------|
-| **Complementary** | Two colors opposite each other (180° apart) | High contrast, visual impact |
-| **Analogous** | Three adjacent colors (±30°) | Harmonious, natural feel |
-| **Triadic** | Three evenly spaced colors (120°) | Balanced, vibrant designs |
-| **Split Complementary** | Base + two adjacent to complement | Dynamic with less tension |
-| **Tetradic** | Four colors in rectangular formation | Rich, complex palettes |
-| **Monochromatic** | Single hue, varying lightness/saturation | Clean, minimalist designs |
+| Mode | Description | Best For | Color Count |
+|------|-------------|----------|-------------|
+| **Complementary** | Two colors opposite each other (180° apart) | High contrast, visual impact | 2 |
+| **Analogous** | Three adjacent colors (±30°) | Harmonious, natural feel | 3 |
+| **Triadic** | Three evenly spaced colors (120°) | Balanced, vibrant designs | 3 |
+| **Split Complementary** | Base + two adjacent to complement | Dynamic with less tension | 3 |
+| **Tetradic** | Four colors in rectangular formation | Rich, complex palettes | 4 |
+| **Monochromatic** | Single hue, varying lightness/saturation | Clean, minimalist designs | 3 |
+| **Diadic** | 60° contrast colors | Modern, fashionable designs | 3 |
+| **Warm-Cool** | Warm and cool tone contrast | Visual depth and layering | 3 |
 
 ### Smart Recommendation Algorithm
 
-The system analyzes your selected color's characteristics:
-- **Dark colors** (L < 30%): Recommends complementary for contrast
-- **Light colors** (L > 70%): Recommends triadic for balance
-- **Muted colors** (S < 30%): Recommends analogous for harmony
-- **Vibrant colors**: Recommends split complementary for dynamic results
+The system analyzes your selected color's characteristics and calculates harmony scores:
+
+- **Color Characteristics Analysis**:
+  - Dark colors (L < 30%): Recommends complementary for contrast
+  - Light colors (L > 70%): Recommends triadic for balance
+  - Muted colors (S < 30%): Recommends analogous for harmony
+  - Vibrant colors (S > 60%, 30% < L < 70%): Recommends split complementary
+  - Warm colors (0°-60°, 300°-360°): Recommends warm-cool contrast
+  - Cool colors (120°-240°): Recommends warm-cool contrast
+
+- **Harmony Score Calculation** (0-100%):
+  - Contrast ratio (30%): WCAG-compliant contrast analysis
+  - Saturation balance (20%): Variance in saturation levels
+  - Lightness balance (20%): Variance in lightness levels
+  - Hue distribution (30%): Ideal color wheel distribution
+
+### Dual-Color Selection
+
+The new color wheel supports simultaneous selection of two colors:
+
+1. **Free Mode**:
+   - Two independent color selectors on the same wheel
+   - Drag either selector to adjust its color
+   - Click on color cards to activate specific selector
+   - Real-time harmony score display
+   - Individual lightness controls for each color
+
+2. **Recommendation Mode**:
+   - Select a base color on the wheel
+   - System generates top 4 color harmony recommendations
+   - Each recommendation includes harmony score
+   - One-click application of recommended palettes
 
 ## Getting Started
 
@@ -78,10 +110,12 @@ npm test
 
 The test suite validates:
 - Color conversion functions (HEX ↔ RGB ↔ HSL)
-- All six color harmony algorithms
+- All eight color harmony algorithms
 - Contrast ratio calculations (WCAG compliant)
 - Color wheel position calculations
 - Smart recommendation logic
+- Harmony score calculation
+- Dual-color gradient generation
 
 ## Preview
 
@@ -139,7 +173,7 @@ src/
 │   └── page.tsx              # Main application page
 ├── components/
 │   ├── ui/                   # UI components (Button, Card, Input)
-│   └── ColorWheel.tsx        # Interactive color wheel component
+│   └── ColorWheel.tsx        # Interactive dual-color wheel component
 ├── hooks/
 │   └── useGradientGenerator.tsx  # Gradient generation hook
 ├── lib/
@@ -171,7 +205,19 @@ generateHarmonyColors('#FF0000', 'triadic')
 
 // Smart recommendation
 getSmartColorRecommendation('#FF0000')
-// { mode: 'splitComplementary', colors: [...], name: '...', description: '...' }
+// { mode: 'splitComplementary', colors: [...], name: '...', description: '...', score: 85 }
+
+// Get multiple recommendations
+getColorRecommendations('#FF0000', 3)
+// [{ mode: '...', colors: [...], score: 85 }, ...]
+
+// Calculate harmony score
+calculateHarmonyScore(['#FF0000', '#00FFFF'])
+// 85 (0-100 harmony score)
+
+// Generate dual-color gradients
+generateDualColorGradients('#FF0000', '#0000FF')
+// [{ name: 'Classic Gradient', colors: [...], angle: 135, description: '...' }, ...]
 
 // Contrast calculation (WCAG)
 getContrastRatio('#000000', '#FFFFFF')  // 21

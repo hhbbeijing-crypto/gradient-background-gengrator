@@ -1,5 +1,6 @@
 /**
  * 色彩工具函数 - 提供颜色转换和色彩理论算法
+ * 基于现代色彩科学和色彩心理学原理
  */
 
 export interface HSL {
@@ -12,6 +13,14 @@ export interface RGB {
   r: number; // 0-255
   g: number; // 0-255
   b: number; // 0-255
+}
+
+export interface ColorHarmony {
+  mode: HarmonyMode;
+  colors: string[];
+  name: string;
+  description: string;
+  score: number;
 }
 
 /**
@@ -131,7 +140,9 @@ export type HarmonyMode =
   | 'triadic'            // 三角色
   | 'splitComplementary' // 分裂互补色
   | 'tetradic'           // 方形色/四角色
-  | 'monochromatic';     // 单色
+  | 'monochromatic'      // 单色
+  | 'diadic'             // 对比色 (近似互补)
+  | 'warmCool';          // 冷暖对比
 
 /**
  * 根据基础色和和谐模式生成配色方案
@@ -233,6 +244,56 @@ export function generateHarmonyColors(baseColor: string, mode: HarmonyMode): str
           l: Math.max(20, baseHsl.l - 20)
         })
       );
+      break;
+
+    case 'diadic':
+      // 对比色: 色相 +60° (近似互补，创造和谐对比)
+      colors.push(
+        hslToHex({
+          h: (baseHsl.h + 60) % 360,
+          s: Math.min(100, baseHsl.s + 10),
+          l: Math.min(70, Math.max(30, baseHsl.l))
+        }),
+        hslToHex({
+          h: (baseHsl.h + 180) % 360,
+          s: baseHsl.s,
+          l: baseHsl.l
+        })
+      );
+      break;
+
+    case 'warmCool':
+      // 冷暖对比: 基于基础色是暖色还是冷色推荐对比
+      const isWarm = baseHsl.h >= 0 && baseHsl.h <= 60 || baseHsl.h >= 300 && baseHsl.h <= 360;
+      if (isWarm) {
+        // 暖色基础，推荐冷色
+        colors.push(
+          hslToHex({
+            h: 200 + Math.random() * 60, // 蓝绿色系
+            s: Math.min(100, baseHsl.s + 20),
+            l: baseHsl.l
+          }),
+          hslToHex({
+            h: 240 + Math.random() * 40, // 蓝紫色系
+            s: baseHsl.s,
+            l: Math.min(70, baseHsl.l + 10)
+          })
+        );
+      } else {
+        // 冷色基础，推荐暖色
+        colors.push(
+          hslToHex({
+            h: 10 + Math.random() * 40, // 橙红色系
+            s: Math.min(100, baseHsl.s + 20),
+            l: baseHsl.l
+          }),
+          hslToHex({
+            h: 40 + Math.random() * 30, // 黄橙色系
+            s: baseHsl.s,
+            l: Math.min(70, baseHsl.l + 10)
+          })
+        );
+      }
       break;
   }
 
@@ -337,61 +398,166 @@ export function generateColorWheelGradient(): string {
 }
 
 /**
- * 智能推荐最佳配色方案
- * 基于色彩理论和对比度分析
+ * 计算色彩和谐度评分
+ * 基于色彩理论的科学评估
  */
-export function getSmartColorRecommendation(baseColor: string): {
-  mode: HarmonyMode;
-  colors: string[];
-  name: string;
-  description: string;
-} {
+export function calculateHarmonyScore(colors: string[]): number {
+  if (colors.length < 2) return 0;
+  
+  let score = 0;
+  const hsls = colors.map(hexToHsl);
+  
+  // 1. 对比度评分 (30%)
+  for (let i = 0; i < colors.length; i++) {
+    for (let j = i + 1; j < colors.length; j++) {
+      const contrast = getContrastRatio(colors[i], colors[j]);
+      // 理想对比度在 3:1 到 7:1 之间
+      if (contrast >= 3 && contrast <= 7) {
+        score += 30 / (colors.length * (colors.length - 1) / 2);
+      } else if (contrast > 7) {
+        score += 20 / (colors.length * (colors.length - 1) / 2);
+      } else {
+        score += 10 / (colors.length * (colors.length - 1) / 2);
+      }
+    }
+  }
+  
+  // 2. 饱和度平衡评分 (20%)
+  const avgSaturation = hsls.reduce((sum, hsl) => sum + hsl.s, 0) / hsls.length;
+  const saturationVariance = hsls.reduce((sum, hsl) => sum + Math.pow(hsl.s - avgSaturation, 2), 0) / hsls.length;
+  score += Math.max(0, 20 - saturationVariance / 100);
+  
+  // 3. 亮度平衡评分 (20%)
+  const avgLightness = hsls.reduce((sum, hsl) => sum + hsl.l, 0) / hsls.length;
+  const lightnessVariance = hsls.reduce((sum, hsl) => sum + Math.pow(hsl.l - avgLightness, 2), 0) / hsls.length;
+  score += Math.max(0, 20 - lightnessVariance / 100);
+  
+  // 4. 色相分布评分 (30%)
+  if (colors.length >= 2) {
+    const hues = hsls.map(h => h.h).sort((a, b) => a - b);
+    const hueDiffs = [];
+    for (let i = 0; i < hues.length; i++) {
+      const nextIndex = (i + 1) % hues.length;
+      let diff = Math.abs(hues[nextIndex] - hues[i]);
+      if (diff > 180) diff = 360 - diff;
+      hueDiffs.push(diff);
+    }
+    const avgHueDiff = hueDiffs.reduce((a, b) => a + b, 0) / hueDiffs.length;
+    // 理想情况下色相均匀分布
+    const idealDiff = 360 / colors.length;
+    const hueScore = Math.max(0, 30 - Math.abs(avgHueDiff - idealDiff) / 3);
+    score += hueScore;
+  }
+  
+  return Math.min(100, Math.round(score));
+}
+
+/**
+ * 智能推荐最佳配色方案
+ * 基于色彩理论、色彩心理学和对比度分析
+ */
+export function getSmartColorRecommendation(baseColor: string): ColorHarmony {
   const hsl = hexToHsl(baseColor);
   
-  // 根据基础色的特性选择最佳和谐模式
-  let recommendedMode: HarmonyMode;
-  let name: string;
-  let description: string;
-
-  // 分析颜色的饱和度和亮度
-  const isVibrant = hsl.s > 50 && hsl.l > 30 && hsl.l < 70;
+  // 分析颜色的特性
+  const isVibrant = hsl.s > 60 && hsl.l > 30 && hsl.l < 70;
   const isDark = hsl.l < 30;
   const isLight = hsl.l > 70;
   const isMuted = hsl.s < 30;
-
-  if (isMuted) {
-    // 低饱和度颜色适合使用类似色或单色方案
-    recommendedMode = 'analogous';
-    name = '柔和协调';
-    description = '基于类似色的柔和配色，适合优雅、专业的视觉风格';
-  } else if (isDark) {
-    // 深色适合使用互补色增加对比
-    recommendedMode = 'complementary';
-    name = '强烈对比';
-    description = '互补色配色方案，创造强烈的视觉冲击力';
-  } else if (isLight) {
-    // 浅色适合使用三角色或分裂互补色
-    recommendedMode = 'triadic';
-    name = '活力平衡';
-    description = '三角色配色方案，色彩丰富且保持平衡';
-  } else if (isVibrant) {
-    // 鲜艳的颜色适合使用分裂互补色
-    recommendedMode = 'splitComplementary';
-    name = '动态张力';
-    description = '分裂互补色方案，既有对比又不过于强烈';
-  } else {
-    // 默认使用类似色
-    recommendedMode = 'analogous';
-    name = '和谐统一';
-    description = '类似色配色方案，创造和谐统一的视觉效果';
+  const isWarm = (hsl.h >= 0 && hsl.h <= 60) || (hsl.h >= 300 && hsl.h <= 360);
+  const isCool = hsl.h >= 120 && hsl.h <= 240;
+  
+  // 生成所有可能的配色方案并评分
+  const modes: HarmonyMode[] = ['complementary', 'analogous', 'triadic', 'splitComplementary', 'tetradic', 'monochromatic', 'diadic', 'warmCool'];
+  const candidates: ColorHarmony[] = [];
+  
+  for (const mode of modes) {
+    const colors = generateHarmonyColors(baseColor, mode);
+    const score = calculateHarmonyScore(colors);
+    
+    let name: string;
+    let description: string;
+    
+    switch (mode) {
+      case 'complementary':
+        name = '强烈对比';
+        description = '互补色配色方案，创造强烈的视觉冲击力和活力';
+        break;
+      case 'analogous':
+        name = '和谐统一';
+        description = '类似色配色方案，色彩过渡自然，适合优雅的设计风格';
+        break;
+      case 'triadic':
+        name = '活力平衡';
+        description = '三角色配色方案，色彩丰富且保持视觉平衡';
+        break;
+      case 'splitComplementary':
+        name = '动态张力';
+        description = '分裂互补色方案，既有对比又不过于强烈';
+        break;
+      case 'tetradic':
+        name = '丰富多彩';
+        description = '四角色配色方案，适合复杂、丰富的设计需求';
+        break;
+      case 'monochromatic':
+        name = '简约专业';
+        description = '单色配色方案，层次丰富，适合专业、极简风格';
+        break;
+      case 'diadic':
+        name = '现代对比';
+        description = '对比色方案，现代感强，适合时尚设计';
+        break;
+      case 'warmCool':
+        name = '冷暖对比';
+        description = '冷暖色调对比，创造视觉深度和层次感';
+        break;
+      default:
+        name = '智能推荐';
+        description = '基于色彩理论的最佳配色方案';
+    }
+    
+    candidates.push({ mode, colors, name, description, score });
   }
+  
+  // 根据基础色特性调整评分
+  candidates.forEach(candidate => {
+    if (isMuted && candidate.mode === 'analogous') candidate.score += 15;
+    if (isDark && candidate.mode === 'complementary') candidate.score += 10;
+    if (isLight && candidate.mode === 'triadic') candidate.score += 10;
+    if (isVibrant && candidate.mode === 'splitComplementary') candidate.score += 15;
+    if ((isWarm || isCool) && candidate.mode === 'warmCool') candidate.score += 20;
+  });
+  
+  // 返回评分最高的方案
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0];
+}
 
-  return {
-    mode: recommendedMode,
-    colors: generateHarmonyColors(baseColor, recommendedMode),
-    name,
-    description
-  };
+/**
+ * 获取多个配色推荐
+ */
+export function getColorRecommendations(baseColor: string, count: number = 3): ColorHarmony[] {
+  const hsl = hexToHsl(baseColor);
+  const modes: HarmonyMode[] = ['complementary', 'analogous', 'triadic', 'splitComplementary', 'tetradic', 'monochromatic', 'diadic', 'warmCool'];
+  const candidates: ColorHarmony[] = [];
+  
+  for (const mode of modes) {
+    const colors = generateHarmonyColors(baseColor, mode);
+    const score = calculateHarmonyScore(colors);
+    
+    const modeInfo = getHarmonyModes().find(m => m.mode === mode)!;
+    candidates.push({
+      mode,
+      colors,
+      name: modeInfo.name,
+      description: modeInfo.description,
+      score
+    });
+  }
+  
+  // 排序并返回前N个
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates.slice(0, count);
 }
 
 /**
@@ -439,6 +605,86 @@ export function getHarmonyModes(): Array<{
       name: '单色',
       description: '同一色相的不同明度和饱和度',
       colorCount: 3
+    },
+    {
+      mode: 'diadic',
+      name: '对比色',
+      description: '60°夹角的对比配色，现代感强',
+      colorCount: 3
+    },
+    {
+      mode: 'warmCool',
+      name: '冷暖对比',
+      description: '冷暖色调的对比搭配',
+      colorCount: 3
     }
   ];
+}
+
+/**
+ * 生成双色调渐变推荐
+ * 基于两个基础色的最佳渐变方案
+ */
+export function generateDualColorGradients(color1: string, color2: string): Array<{
+  name: string;
+  colors: string[];
+  angle: number;
+  description: string;
+}> {
+  const hsl1 = hexToHsl(color1);
+  const hsl2 = hexToHsl(color2);
+  
+  // 计算两色之间的角度差
+  let hueDiff = Math.abs(hsl1.h - hsl2.h);
+  if (hueDiff > 180) hueDiff = 360 - hueDiff;
+  
+  const gradients: Array<{
+    name: string;
+    colors: string[];
+    angle: number;
+    description: string;
+  }> = [];
+  
+  // 1. 直接渐变
+  gradients.push({
+    name: '经典渐变',
+    colors: [color1, color2],
+    angle: 135,
+    description: '两个颜色直接渐变，简洁有力'
+  });
+  
+  // 2. 添加中间过渡色
+  const midHsl = {
+    h: (hsl1.h + (hsl2.h > hsl1.h ? (hsl2.h - hsl1.h) / 2 : (hsl2.h + 360 - hsl1.h) / 2)) % 360,
+    s: (hsl1.s + hsl2.s) / 2,
+    l: (hsl1.l + hsl2.l) / 2
+  };
+  gradients.push({
+    name: '柔和过渡',
+    colors: [color1, hslToHex(midHsl), color2],
+    angle: 135,
+    description: '添加中间色，过渡更加柔和自然'
+  });
+  
+  // 3. 基于色彩理论的扩展
+  if (hueDiff < 60) {
+    // 类似色，添加一个对比色
+    const contrastHsl = { ...hsl1, h: (hsl1.h + 180) % 360 };
+    gradients.push({
+      name: '对比增强',
+      colors: [color1, color2, hslToHex(contrastHsl)],
+      angle: 120,
+      description: '在类似色基础上添加对比色，增加视觉冲击力'
+    });
+  } else if (hueDiff > 120) {
+    // 对比色，添加中间调和色
+    gradients.push({
+      name: '和谐过渡',
+      colors: [color1, hslToHex(midHsl), color2],
+      angle: 150,
+      description: '通过中间色调和强烈对比'
+    });
+  }
+  
+  return gradients;
 }
